@@ -1,5 +1,5 @@
 """
-Extract logs from Kubernetes Deployment or StatefulSet via kubectl.
+Extract logs from Kubernetes Deployment / StatefulSet / DaemonSet via kubectl.
 Supports time range and outputs raw log stream for preprocessing.
 """
 from __future__ import annotations
@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 @dataclass
 class ExtractParams:
-    component_type: str  # "deployment" | "statefulset"
+    component_type: str  # "deployment" | "statefulset" | "daemonset"
     name: str
     namespace: str = "default"
     since: Optional[str] = None  # e.g. "1h", "30m", "24h"
@@ -26,7 +26,7 @@ def _kubectl_available() -> bool:
 
 
 def get_pod_selector(component_type: str, name: str, namespace: str, kubeconfig: Optional[str] = None) -> Tuple[str, str]:
-    """Resolve label selector for Deployment or StatefulSet."""
+    """Resolve label selector for Deployment / StatefulSet / DaemonSet."""
     cmd = [
         "kubectl", "get", component_type, name,
         "-n", namespace,
@@ -55,14 +55,16 @@ def get_pod_selector(component_type: str, name: str, namespace: str, kubeconfig:
 
 def extract_logs(params: ExtractParams) -> Tuple[str, str]:
     """
-    Extract logs from all pods matching the Deployment/StatefulSet.
+    Extract logs from all pods matching Deployment/StatefulSet/DaemonSet.
     Returns (stdout_text, error_message). error_message non-empty on failure.
     """
     if not _kubectl_available():
         return "", "kubectl not found in PATH"
 
     kind = params.component_type.strip().lower()
-    if kind not in ("deployment", "statefulset"):
+    if kind == "stateefulset":
+        kind = "statefulset"
+    if kind not in ("deployment", "statefulset", "daemonset"):
         return "", f"Unsupported component_type: {params.component_type}"
 
     selector, err = get_pod_selector(kind, params.name, params.namespace, params.kubeconfig)

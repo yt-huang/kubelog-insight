@@ -61,6 +61,7 @@ class AnalysisRequest:
     kubeconfig: Optional[str] = None  # e.g. /opt/config
     max_iterations: int = 50  # kubectl-ai --max-iterations
     analysis_mode: str = "simple"  # simple | full_scan (Java 异常扫描+统计)
+    skip_permissions: bool = True  # kubectl-ai --skip-permissions (RunOnce 需要)
 
 
 def _kubectl_ai_available() -> bool:
@@ -148,6 +149,9 @@ def run_kubectl_ai(analysis_request: AnalysisRequest) -> Tuple[str, str]:
     # Build command: --quiet, --max-iterations, --llm-provider, --model
     args = ["ai", "--quiet"] if binary == "kubectl" else ["--quiet"]
     args.extend(["--max-iterations", str(max(1, min(100, analysis_request.max_iterations)))])
+    if analysis_request.skip_permissions:
+        # Avoid RunOnce permission prompt failures in quiet mode.
+        args.append("--skip-permissions")
     
     provider = analysis_request.llm_provider or "gemini"
     args.extend(["--llm-provider", provider])

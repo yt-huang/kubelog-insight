@@ -74,12 +74,64 @@ body {
   margin-bottom: 12px;
 }
 
+.component-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.component-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 10px;
+  align-items: end;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  background: #0d1730;
+}
+
 label {
   display: flex;
   flex-direction: column;
   font-size: 13px;
   color: var(--muted);
   gap: 6px;
+}
+
+.inline-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.inline-tools input[type="file"] {
+  flex: 1 1 auto;
+  min-width: 180px;
+}
+
+.inline-tools .btn {
+  flex: 0 0 auto;
+  min-width: 84px;
+  white-space: nowrap;
+}
+
+.kube-status {
+  height: 38px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #0b1429;
+  color: #ffd27a;
+}
+
+.kube-status.ok {
+  color: #7dffb0;
+  border-color: #2f8455;
 }
 
 input,
@@ -197,6 +249,9 @@ select:focus {
     gap: 10px;
   }
   .grid {
+    grid-template-columns: 1fr;
+  }
+  .component-row {
     grid-template-columns: 1fr;
   }
 }

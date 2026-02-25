@@ -21,7 +21,7 @@ from datetime import datetime
 
 def main():
     p = argparse.ArgumentParser(description="K8s 日志分析（命令行）")
-    p.add_argument("--type", "-t", choices=["deployment", "statefulset"], default="deployment", help="组件类型")
+    p.add_argument("--type", "-t", choices=["deployment", "statefulset", "daemonset"], default="deployment", help="组件类型")
     p.add_argument("--name", "-n", required=True, help="组件名称")
     p.add_argument("--namespace", "-N", default="default", help="命名空间")
     p.add_argument("--since", "-s", default="1h", help="时间范围，如 1h, 30m, 24h")

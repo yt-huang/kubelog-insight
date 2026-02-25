@@ -21,20 +21,32 @@
 
       <main class="layout">
         <section class="panel">
-          <h2>分析参数</h2>
+          <h2>kubeconfig 连接</h2>
           <div class="grid">
-            <label>组件类型
-              <select id="componentType">
-                <option value="deployment">deployment</option>
-                <option value="statefulset">statefulset</option>
-              </select>
+            <label>kubeconfig 路径
+              <input id="kubeconfig" placeholder="/opt/config（可选）" />
             </label>
-            <label>组件名称
-              <input id="componentName" placeholder="例如 nginx" />
+            <label>上传 kubeconfig
+              <div class="inline-tools">
+                <input id="kubeconfigFile" type="file" />
+                <button id="btnUploadKubeconfig" type="button" class="btn ghost">上传</button>
+                <button id="btnTestKubeconfig" type="button" class="btn ghost">测试连接</button>
+              </div>
             </label>
-            <label>命名空间
-              <input id="namespace" value="default" />
+            <label>连接状态
+              <div id="kubeconfigState" class="kube-status">未连接</div>
             </label>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>分析参数</h2>
+          <div id="componentRows" class="component-rows"></div>
+          <div class="actions">
+            <button id="btnAddComponent" class="btn ghost" type="button">+ 新增组件</button>
+          </div>
+
+          <div class="grid">
             <label>时间范围
               <input id="timeRange" value="1h" placeholder="1h / 30m / 24h" />
             </label>
@@ -51,13 +63,10 @@
 
           <h2>模型与连接</h2>
           <div class="grid">
-            <label>kubeconfig 路径
-              <input id="kubeconfig" placeholder="/opt/config（可选）" />
-            </label>
             <label>LLM Provider
               <select id="llmProvider">
+                <option value="openai" selected>openai</option>
                 <option value="gemini">gemini</option>
-                <option value="openai">openai</option>
                 <option value="azopenai">azopenai</option>
                 <option value="grok">grok</option>
                 <option value="ollama">ollama</option>
@@ -65,10 +74,10 @@
               </select>
             </label>
             <label>Model
-              <input id="model" placeholder="例如 deepseek-chat" />
+              <input id="model" value="deepseek-chat" placeholder="例如 deepseek-chat" />
             </label>
             <label>API Base URL
-              <input id="apiBaseUrl" placeholder="可选" />
+              <input id="apiBaseUrl" value="https://api.deepseek.com" placeholder="可选" />
             </label>
             <label>API Key
               <input id="apiKey" type="password" placeholder="可选" />
@@ -96,6 +105,28 @@
         </section>
       </main>
     </div>
+    <template id="componentRowTemplate">
+      <div class="component-row">
+        <label>组件类型
+          <select class="componentType">
+            <option value="deployment">deployment</option>
+            <option value="statefulset">statefulset</option>
+            <option value="daemonset">daemonset</option>
+          </select>
+        </label>
+        <label>命名空间
+          <select class="namespaceSelect">
+            <option value="default">default</option>
+          </select>
+        </label>
+        <label>组件名称
+          <select class="componentNameSelect">
+            <option value="">请选择组件名称</option>
+          </select>
+        </label>
+        <button class="btn ghost btnRemoveComponent" type="button">删除</button>
+      </div>
+    </template>
     <script src="/static/app.js"></script>
   </body>
   </html>

@@ -1,3 +1,603 @@
+# KubeLog Insight
+
+一个面向 Kubernetes 日志排障的 AI 分析工具。  
+它把 `kubectl` 日志提取、日志预处理、`kubectl-ai` 智能分析、历史记录管理和 PDF 报告导出串成一条完整流程，提供 **Web UI / Tkinter / CLI** 三种使用方式。
+
+---
+
+## 项目简介
+
+在 Kubernetes 环境中，日志量巨大、排障时间长、异常定位难。  
+`KubeLog Insight` 的目标是：**让用户只输入组件和时间范围，就能快速得到结构化异常分析结果**。
+
+核心场景：
+- 快速识别 `NullPointerException`、`OOM`、`panic`、连接失败等高风险问题
+- 支持 Deployment / StatefulSet 两类工作负载
+- 支持 OpenAI / Gemini / Azure OpenAI / Grok / Ollama / VertexAI 等多模型接入
+- 支持分析历史沉淀与 PDF 报告输出，便于复盘和汇报
+
+---
+
+## 核心能力
+
+### 1) 一站式日志分析流水线
+- 自动执行：日志提取 -> 预处理 -> AI 分析
+- 日志提取：基于 `kubectl get` + `kubectl logs -l` 获取目标组件日志
+- 预处理：关键字过滤、采样（优先异常行 + 头尾样本）、内容裁剪
+- 智能分析：统一封装 `kubectl-ai` 调用，返回可读的异常总结与建议
+
+### 2) 多种分析模式
+- `simple`：快速排查，输出核心异常与建议
+- `full_scan`：偏运维排障风格，输出：
+  - Java 异常抓取（RuntimeException/Error/Exception|Error 关键字）
+  - 结构化结果（时间、Pod/容器、异常类型、异常信息）
+  - 按异常类型聚合统计、高频 Pod 标记、关键问题分析
+
+### 3) 多模型与企业环境兼容
+- 支持 `llm_provider` + `model` 动态配置（如 `openai + deepseek-chat`）
+- 支持 `api_base_url`（兼容 OpenAI 风格网关）
+- 支持自定义 `kubeconfig` 路径（如 `/opt/config`）
+- 支持 `max_iterations` 调优（默认 50）
+
+### 4) 三种入口，适配不同用户
+- **Web UI（默认）**：现代化 HTML 界面，风格简洁清晰
+- **Tkinter UI（兼容）**：保留桌面端入口
+- **CLI**：便于脚本化、CI 或远程机器使用
+
+### 5) 可追溯与可输出
+- 历史记录本地持久化：`~/.config/k8s-log-analyzer/history/`
+- 结果可导出 PDF：
+  - 单次分析报告
+  - 项目说明文档
+
+---
+
+## 技术架构
+
+```text
+Web/Tkinter/CLI
+      |
+      v
+analysis_engine.run_analysis()
+      |
+      +--> log_extractor.py   (kubectl get / kubectl logs)
+      +--> preprocessor.py    (regex filter + sampling + cap)
+      +--> api_layer.py       (kubectl-ai provider/model dispatch)
+      +--> history_store.py   (json files)
+      +--> pdf_report.py      (ReportLab)
+```
+
+---
+
+## 目录结构
+
+```text
+.
+├── main.py                   # 统一入口（默认 Web，可 --ui tkinter）
+├── run_analysis_cli.py       # 命令行入口
+├── requirements.txt
+├── gui/                      # Tkinter 版本 GUI
+│   └── app.py
+├── webui/                    # Flask + HTML/CSS/JS Web UI
+│   ├── server.py
+│   ├── templates/index.html
+│   └── static/
+│       ├── style.css
+│       └── app.js
+└── k8s_log_analyzer/         # 核心分析引擎
+    ├── analysis_engine.py
+    ├── log_extractor.py
+    ├── preprocessor.py
+    ├── api_layer.py
+    ├── history_store.py
+    ├── config_store.py
+    └── pdf_report.py
+```
+
+---
+
+## 安装与启动
+
+### 1) 环境准备
+- Python 3.8+
+- 可访问 Kubernetes 集群的 `kubectl`
+- `kubectl-ai` 已安装并可执行
+- 对应模型的 API Key（按你选择的 Provider）
+
+### 2) 安装依赖
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 3) 启动方式
+
+#### Web UI（默认）
+
+```bash
+python3 main.py
+# 或
+python3 webui/server.py
+```
+
+默认地址：`http://127.0.0.1:8787`
+
+#### Tkinter UI
+
+```bash
+python3 main.py --ui tkinter
+```
+
+#### CLI
+
+```bash
+python3 run_analysis_cli.py \
+  --type deployment \
+  --name nginx \
+  --namespace default \
+  --since 1h \
+  --llm-provider openai \
+  --model deepseek-chat \
+  --kubeconfig /opt/config
+```
+
+---
+
+## 典型使用场景
+
+### 场景 1：快速定位线上异常
+- 选择 `deployment` + 组件名 + `1h`
+- 模式用 `simple`
+- 快速拿到异常摘要与修复建议
+
+### 场景 2：集中排查 Java 类异常
+- 模式切换到 `full_scan`
+- 查看异常明细和聚合统计
+- 用于复盘高频问题 Pod 与发生趋势
+
+### 场景 3：输出汇报材料
+- 分析后直接导出 PDF
+- 搭配历史记录，形成排障闭环
+
+---
+
+## API（Web UI 后端）
+
+主要接口：
+- `POST /api/analyze`：执行分析
+- `GET /api/history`：历史列表
+- `GET /api/history/<id>`：历史详情
+- `DELETE /api/history/<id>`：删除历史
+- `POST /api/export/analysis-pdf`：导出单次分析 PDF
+- `POST /api/export/project-pdf`：导出项目说明 PDF
+
+---
+
+## 与 AI Agent 协作开发说明
+
+本项目从需求梳理到实现落地，采用“AI Agent + 人工评审”的协作模式，重点体现在：
+- 架构拆分：提炼出 `extract -> preprocess -> analyze` 的稳定主流程
+- 命令抽象：统一封装 `provider/model/kubeconfig/max_iterations` 参数
+- 交互升级：从桌面 GUI 扩展到 Web UI，提升可用性与展示效果
+- 稳定性优化：解决 UI 卡顿问题，补齐 `python3 webui/server.py` 直跑能力
+
+---
+
+## 发展方向
+
+- 支持 DaemonSet/Job/CronJob 等更多工作负载
+- 增加结果流式输出（SSE/WebSocket）
+- 增加多租户权限与审计能力
+- 提供更细粒度的日志切片策略与异常分类模型
+
+---
+
+## License
+
+Apache-2.0
+
+# KubeLog Insight
+
+一个面向 Kubernetes 日志排障的 AI 分析工具。  
+它把 `kubectl` 日志提取、日志预处理、`kubectl-ai` 智能分析、历史记录管理和 PDF 报告导出串成一条完整流程，提供 **Web UI / Tkinter / CLI** 三种使用方式。
+
+---
+
+## 项目简介
+
+在 Kubernetes 环境中，日志量巨大、排障时间长、异常定位难。  
+`KubeLog Insight` 的目标是：**让用户只输入组件和时间范围，就能快速得到结构化异常分析结果**。
+
+核心场景：
+- 快速识别 `NullPointerException`、`OOM`、`panic`、连接失败等高风险问题
+- 支持 Deployment / StatefulSet 两类工作负载
+- 支持 OpenAI / Gemini / Azure OpenAI / Grok / Ollama / VertexAI 等多模型接入
+- 支持分析历史沉淀与 PDF 报告输出，便于复盘和汇报
+
+---
+
+## 核心能力
+
+### 1) 一站式日志分析流水线
+- 自动执行：日志提取 -> 预处理 -> AI 分析
+- 日志提取：基于 `kubectl get` + `kubectl logs -l` 获取目标组件日志
+- 预处理：关键字过滤、采样（优先异常行 + 头尾样本）、内容裁剪
+- 智能分析：统一封装 `kubectl-ai` 调用，返回可读的异常总结与建议
+
+### 2) 多种分析模式
+- `simple`：快速排查，输出核心异常与建议
+- `full_scan`：偏运维排障风格，输出：
+  - Java 异常抓取（RuntimeException/Error/Exception|Error 关键字）
+  - 结构化结果（时间、Pod/容器、异常类型、异常信息）
+  - 按异常类型聚合统计、高频 Pod 标记、关键问题分析
+
+### 3) 多模型与企业环境兼容
+- 支持 `llm_provider` + `model` 动态配置（如 `openai + deepseek-chat`）
+- 支持 `api_base_url`（兼容 OpenAI 风格网关）
+- 支持自定义 `kubeconfig` 路径（如 `/opt/config`）
+- 支持 `max_iterations` 调优（默认 50）
+
+### 4) 三种入口，适配不同用户
+- **Web UI（默认）**：现代化 HTML 界面，风格简洁清晰
+- **Tkinter UI（兼容）**：保留桌面端入口
+- **CLI**：便于脚本化、CI 或远程机器使用
+
+### 5) 可追溯与可输出
+- 历史记录本地持久化：`~/.config/k8s-log-analyzer/history/`
+- 结果可导出 PDF：
+  - 单次分析报告
+  - 项目说明文档
+
+---
+
+## 技术架构
+
+```text
+Web/Tkinter/CLI
+      |
+      v
+analysis_engine.run_analysis()
+      |
+      +--> log_extractor.py   (kubectl get / kubectl logs)
+      +--> preprocessor.py    (regex filter + sampling + cap)
+      +--> api_layer.py       (kubectl-ai provider/model dispatch)
+      +--> history_store.py   (json files)
+      +--> pdf_report.py      (ReportLab)
+```
+
+---
+
+## 目录结构
+
+```text
+.
+├── main.py                   # 统一入口（默认 Web，可 --ui tkinter）
+├── run_analysis_cli.py       # 命令行入口
+├── requirements.txt
+├── gui/                      # Tkinter 版本 GUI
+│   └── app.py
+├── webui/                    # Flask + HTML/CSS/JS Web UI
+│   ├── server.py
+│   ├── templates/index.html
+│   └── static/
+│       ├── style.css
+│       └── app.js
+└── k8s_log_analyzer/         # 核心分析引擎
+    ├── analysis_engine.py
+    ├── log_extractor.py
+    ├── preprocessor.py
+    ├── api_layer.py
+    ├── history_store.py
+    ├── config_store.py
+    └── pdf_report.py
+```
+
+---
+
+## 安装与启动
+
+### 1) 环境准备
+- Python 3.8+
+- 可访问 Kubernetes 集群的 `kubectl`
+- `kubectl-ai` 已安装并可执行
+- 对应模型的 API Key（按你选择的 Provider）
+
+### 2) 安装依赖
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 3) 启动方式
+
+#### Web UI（默认）
+
+```bash
+python3 main.py
+# 或
+python3 webui/server.py
+```
+
+默认地址：`http://127.0.0.1:8787`
+
+#### Tkinter UI
+
+```bash
+python3 main.py --ui tkinter
+```
+
+#### CLI
+
+```bash
+python3 run_analysis_cli.py \
+  --type deployment \
+  --name nginx \
+  --namespace default \
+  --since 1h \
+  --llm-provider openai \
+  --model deepseek-chat \
+  --kubeconfig /opt/config
+```
+
+---
+
+## 典型使用场景
+
+### 场景 1：快速定位线上异常
+- 选择 `deployment` + 组件名 + `1h`
+- 模式用 `simple`
+- 快速拿到异常摘要与修复建议
+
+### 场景 2：集中排查 Java 类异常
+- 模式切换到 `full_scan`
+- 查看异常明细和聚合统计
+- 用于复盘高频问题 Pod 与发生趋势
+
+### 场景 3：输出汇报材料
+- 分析后直接导出 PDF
+- 搭配历史记录，形成排障闭环
+
+---
+
+## API（Web UI 后端）
+
+主要接口：
+- `POST /api/analyze`：执行分析
+- `GET /api/history`：历史列表
+- `GET /api/history/<id>`：历史详情
+- `DELETE /api/history/<id>`：删除历史
+- `POST /api/export/analysis-pdf`：导出单次分析 PDF
+- `POST /api/export/project-pdf`：导出项目说明 PDF
+
+---
+
+## 与 AI Agent 协作开发说明
+
+本项目从需求梳理到实现落地，采用“AI Agent + 人工评审”的协作模式，重点体现在：
+- 架构拆分：提炼出 `extract -> preprocess -> analyze` 的稳定主流程
+- 命令抽象：统一封装 `provider/model/kubeconfig/max_iterations` 参数
+- 交互升级：从桌面 GUI 扩展到 Web UI，提升可用性与展示效果
+- 稳定性优化：解决 UI 卡顿问题，补齐 `python3 webui/server.py` 直跑能力
+
+---
+
+## 发展方向
+
+- 支持 DaemonSet/Job/CronJob 等更多工作负载
+- 增加结果流式输出（SSE/WebSocket）
+- 增加多租户权限与审计能力
+- 提供更细粒度的日志切片策略与异常分类模型
+
+---
+
+## License
+
+Apache-2.0
+
+# KubeLog Insight
+
+一个面向 Kubernetes 日志排障的 AI 分析工具。  
+它把 `kubectl` 日志提取、日志预处理、`kubectl-ai` 智能分析、历史记录管理和 PDF 报告导出串成一条完整流程，提供 **Web UI / Tkinter / CLI** 三种使用方式。
+
+---
+
+## 项目简介
+
+在 Kubernetes 环境中，日志量巨大、排障时间长、异常定位难。  
+`KubeLog Insight` 的目标是：**让用户只输入组件和时间范围，就能快速得到结构化异常分析结果**。
+
+核心场景：
+- 快速识别 `NullPointerException`、`OOM`、`panic`、连接失败等高风险问题
+- 支持 Deployment / StatefulSet 两类工作负载
+- 支持 OpenAI / Gemini / Azure OpenAI / Grok / Ollama / VertexAI 等多模型接入
+- 支持分析历史沉淀与 PDF 报告输出，便于复盘和汇报
+
+---
+
+## 核心能力
+
+### 1) 一站式日志分析流水线
+- 自动执行：日志提取 -> 预处理 -> AI 分析
+- 日志提取：基于 `kubectl get` + `kubectl logs -l` 获取目标组件日志
+- 预处理：关键字过滤、采样（优先异常行 + 头尾样本）、内容裁剪
+- 智能分析：统一封装 `kubectl-ai` 调用，返回可读的异常总结与建议
+
+### 2) 多种分析模式
+- `simple`：快速排查，输出核心异常与建议
+- `full_scan`：偏运维排障风格，输出：
+  - Java 异常抓取（RuntimeException/Error/Exception|Error 关键字）
+  - 结构化结果（时间、Pod/容器、异常类型、异常信息）
+  - 按异常类型聚合统计、高频 Pod 标记、关键问题分析
+
+### 3) 多模型与企业环境兼容
+- 支持 `llm_provider` + `model` 动态配置（如 `openai + deepseek-chat`）
+- 支持 `api_base_url`（兼容 OpenAI 风格网关）
+- 支持自定义 `kubeconfig` 路径（如 `/opt/config`）
+- 支持 `max_iterations` 调优（默认 50）
+
+### 4) 三种入口，适配不同用户
+- **Web UI（默认）**：现代化 HTML 界面，风格简洁清晰
+- **Tkinter UI（兼容）**：保留桌面端入口
+- **CLI**：便于脚本化、CI 或远程机器使用
+
+### 5) 可追溯与可输出
+- 历史记录本地持久化：`~/.config/k8s-log-analyzer/history/`
+- 结果可导出 PDF：
+  - 单次分析报告
+  - 项目说明文档
+
+---
+
+## 技术架构
+
+```text
+Web/Tkinter/CLI
+      |
+      v
+analysis_engine.run_analysis()
+      |
+      +--> log_extractor.py   (kubectl get / kubectl logs)
+      +--> preprocessor.py    (regex filter + sampling + cap)
+      +--> api_layer.py       (kubectl-ai provider/model dispatch)
+      +--> history_store.py   (json files)
+      +--> pdf_report.py      (ReportLab)
+```
+
+---
+
+## 目录结构
+
+```text
+.
+├── main.py                   # 统一入口（默认 Web，可 --ui tkinter）
+├── run_analysis_cli.py       # 命令行入口
+├── requirements.txt
+├── gui/                      # Tkinter 版本 GUI
+│   └── app.py
+├── webui/                    # Flask + HTML/CSS/JS Web UI
+│   ├── server.py
+│   ├── templates/index.html
+│   └── static/
+│       ├── style.css
+│       └── app.js
+└── k8s_log_analyzer/         # 核心分析引擎
+    ├── analysis_engine.py
+    ├── log_extractor.py
+    ├── preprocessor.py
+    ├── api_layer.py
+    ├── history_store.py
+    ├── config_store.py
+    └── pdf_report.py
+```
+
+---
+
+## 安装与启动
+
+## 1) 环境准备
+- Python 3.8+
+- 可访问 Kubernetes 集群的 `kubectl`
+- `kubectl-ai` 已安装并可执行
+- 对应模型的 API Key（按你选择的 Provider）
+
+## 2) 安装依赖
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+## 3) 启动方式
+
+### Web UI（默认）
+
+```bash
+python3 main.py
+# 或
+python3 webui/server.py
+```
+
+默认地址：`http://127.0.0.1:8787`
+
+### Tkinter UI
+
+```bash
+python3 main.py --ui tkinter
+```
+
+### CLI
+
+```bash
+python3 run_analysis_cli.py \
+  --type deployment \
+  --name nginx \
+  --namespace default \
+  --since 1h \
+  --llm-provider openai \
+  --model deepseek-chat \
+  --kubeconfig /opt/config
+```
+
+---
+
+## 典型使用场景
+
+### 场景 1：快速定位线上异常
+- 选择 `deployment` + 组件名 + `1h`
+- 模式用 `simple`
+- 快速拿到异常摘要与修复建议
+
+### 场景 2：集中排查 Java 类异常
+- 模式切换到 `full_scan`
+- 查看异常明细和聚合统计
+- 用于复盘高频问题 Pod 与发生趋势
+
+### 场景 3：输出汇报材料
+- 分析后直接导出 PDF
+- 搭配历史记录，形成排障闭环
+
+---
+
+## API（Web UI 后端）
+
+主要接口：
+- `POST /api/analyze`：执行分析
+- `GET /api/history`：历史列表
+- `GET /api/history/<id>`：历史详情
+- `DELETE /api/history/<id>`：删除历史
+- `POST /api/export/analysis-pdf`：导出单次分析 PDF
+- `POST /api/export/project-pdf`：导出项目说明 PDF
+
+---
+
+## 与 AI Agent 协作开发说明
+
+本项目从需求梳理到实现落地，采用“AI Agent + 人工评审”的协作模式，重点体现在：
+- 架构拆分：提炼出 `extract -> preprocess -> analyze` 的稳定主流程
+- 命令抽象：统一封装 `provider/model/kubeconfig/max_iterations` 参数
+- 交互升级：从桌面 GUI 扩展到 Web UI，提升可用性与展示效果
+- 稳定性优化：解决 UI 卡顿问题，补齐 `python3 webui/server.py` 直跑能力
+
+---
+
+## 发展方向
+
+- 支持 DaemonSet/Job/CronJob 等更多工作负载
+- 增加结果流式输出（SSE/WebSocket）
+- 增加多租户权限与审计能力
+- 提供更细粒度的日志切片策略与异常分类模型
+
+---
+
+## License
+
+Apache-2.0
+
 # kubectl-ai
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/GoogleCloudPlatform/kubectl-ai)](https://goreportcard.com/report/github.com/GoogleCloudPlatform/kubectl-ai)
