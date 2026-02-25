@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.DS_Store
+
+# Local build/runtime artifacts
+.sisyphus/
+.venv/
+
+# Local binaries and archives (do not commit)
+kubectl-ai
+kubectl-ai_*.tar.gz

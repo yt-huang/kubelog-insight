@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>K8s 日志分析平台</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="topbar">
+        <div>
+          <h1>K8s 日志分析平台</h1>
+          <p>简洁 · 实用 · 清晰</p>
+        </div>
+        <div class="topbar-actions">
+          <button id="btnRefreshHistory" class="btn ghost">刷新历史</button>
+          <button id="btnExportProjectPdf" class="btn ghost">导出项目 PDF</button>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="panel">
+          <h2>分析参数</h2>
+          <div class="grid">
+            <label>组件类型
+              <select id="componentType">
+                <option value="deployment">deployment</option>
+                <option value="statefulset">statefulset</option>
+              </select>
+            </label>
+            <label>组件名称
+              <input id="componentName" placeholder="例如 nginx" />
+            </label>
+            <label>命名空间
+              <input id="namespace" value="default" />
+            </label>
+            <label>时间范围
+              <input id="timeRange" value="1h" placeholder="1h / 30m / 24h" />
+            </label>
+            <label>最大日志行数
+              <input id="tailLines" type="number" value="5000" min="100" step="100" />
+            </label>
+            <label>分析模式
+              <select id="analysisMode">
+                <option value="simple">simple（快速）</option>
+                <option value="full_scan">full_scan（异常扫描+统计）</option>
+              </select>
+            </label>
+          </div>
+
+          <h2>模型与连接</h2>
+          <div class="grid">
+            <label>kubeconfig 路径
+              <input id="kubeconfig" placeholder="/opt/config（可选）" />
+            </label>
+            <label>LLM Provider
+              <select id="llmProvider">
+                <option value="gemini">gemini</option>
+                <option value="openai">openai</option>
+                <option value="azopenai">azopenai</option>
+                <option value="grok">grok</option>
+                <option value="ollama">ollama</option>
+                <option value="vertexai">vertexai</option>
+              </select>
+            </label>
+            <label>Model
+              <input id="model" placeholder="例如 deepseek-chat" />
+            </label>
+            <label>API Base URL
+              <input id="apiBaseUrl" placeholder="可选" />
+            </label>
+            <label>API Key
+              <input id="apiKey" type="password" placeholder="可选" />
+            </label>
+            <label>Max Iterations
+              <input id="maxIterations" type="number" value="50" min="1" max="100" />
+            </label>
+          </div>
+
+          <div class="actions">
+            <button id="btnAnalyze" class="btn primary">开始分析</button>
+            <button id="btnExportResultPdf" class="btn">导出本次结果 PDF</button>
+            <span id="status" class="status">就绪</span>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>分析结果</h2>
+          <pre id="resultBox" class="result">等待执行...</pre>
+        </section>
+
+        <section class="panel">
+          <h2>历史记录</h2>
+          <div id="historyList" class="history-list"></div>
+        </section>
+      </main>
+    </div>
+    <script src="/static/app.js"></script>
+  </body>
+  </html>
+

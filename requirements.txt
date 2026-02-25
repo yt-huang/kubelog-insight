@@ -1,0 +1,6 @@
+# Kubernetes Log Analyzer - Dependencies
+# Python 3.8+
+
+flask>=3.0.0
+reportlab>=4.0.0
+# Tkinter is in stdlib, no pip package
